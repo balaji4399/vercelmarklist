@@ -1,44 +1,45 @@
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 import json
-import os
 
 app = FastAPI()
 
-# Enable CORS
+# CORS setup
+origins = ["*"]  # Allow all origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["*"],  # Only allow GET requests
     allow_headers=["*"],
 )
-
-# Load the marks data from q-vercel-python.json
-file_path = os.path.join(os.path.dirname(__file__), 'q-vercel-python.json')
+file_path = 'q-vercel-python.json'
 with open(file_path, 'r') as f:
     students_marks_list = json.load(f)
 
 # Convert the list of dictionaries to a dictionary
 students_marks = {student['name']: student['marks'] for student in students_marks_list}
+# Load student data (replace with your actual file loading)
+# Handle the case where the file isn't found.  Provide some default data if needed.
 
 @app.get("/api")
-async def get_marks(request: Request):
-    query_params = request.query_params
-    names = query_params.getlist("name")
-    if not names:
+async def get_marks(name: list[str] = Query(None)): # Allows for multiple name parameters
+    if name is None:
         raise HTTPException(status_code=400, detail="At least one name must be provided.")
-    
+
     marks = []
     not_found = []
-    for name in names:
-        if name in students_marks:
-            marks.append(students_marks[name])
-        else:
-            not_found.append(name)
-    
-    response = {"marks": marks}
+    for n in name:
+      if n in students_marks:
+        marks.append(students_marks[n])
+      else:
+        not_found.append(n)
+
     if not_found:
-        response["message"] = f"Names not found: {', '.join(not_found)}"
-    
-    return json.dumps(response)
+      error_message = f"Names not found: {', '.join(not_found)}"
+      if marks: # some names were found
+          return {"marks": marks, "message": error_message}
+      else: # no names were found
+          raise HTTPException(status_code=404, detail=error_message)
+
+    return {"marks": marks}
